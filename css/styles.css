@@ -169,6 +169,37 @@ p {
   color: var(--muted);
 }
 
+.auth-message {
+  display: none;
+  margin: 1rem 0 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: #f8fafc;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.auth-message.visible {
+  display: block;
+}
+
+.auth-message.success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.auth-message.error {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.dashboard-message {
+  margin-bottom: 1rem;
+}
+
 label {
   margin: 1rem 0 0.35rem;
   font-weight: 700;
