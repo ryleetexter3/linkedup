@@ -137,10 +137,43 @@
             <p class="eyebrow">Planned stops</p>
             <h2 id="itinerary-title">Itinerary</h2>
           </div>
+          <button class="secondary-button compact-button" id="add-itinerary-item-button" type="button">Add Item</button>
         </div>
 
-        <div class="itinerary-list">
-          <p class="empty-state">Itinerary items will be added in a later step.</p>
+        <form class="itinerary-form" id="itinerary-form" hidden>
+          <div>
+            <label for="activity-name">Activity name</label>
+            <input id="activity-name" name="activity_name" type="text" placeholder="Dinner reservation" required>
+          </div>
+
+          <div>
+            <label for="activity-time">Time</label>
+            <input id="activity-time" name="activity_time" type="time">
+          </div>
+
+          <div>
+            <label for="activity-location">Location</label>
+            <input id="activity-location" name="location" type="text" placeholder="Main Street Cafe">
+          </div>
+
+          <div>
+            <label for="activity-category">Category</label>
+            <input id="activity-category" name="category" type="text" placeholder="Food, travel, activity">
+          </div>
+
+          <div class="full-width-field">
+            <label for="activity-notes">Notes</label>
+            <textarea id="activity-notes" name="notes" rows="3" placeholder="Optional details for this stop"></textarea>
+          </div>
+
+          <div class="form-actions full-width-field">
+            <button class="secondary-button compact-button" id="cancel-itinerary-item-button" type="button">Cancel</button>
+            <button class="primary-action compact-button" type="submit" data-default-text="Save Item">Save Item</button>
+          </div>
+        </form>
+
+        <div class="itinerary-list" id="itinerary-list">
+          <p class="empty-state">Select an event to view itinerary items.</p>
         </div>
       </aside>
     </section>

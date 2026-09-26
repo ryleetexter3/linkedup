@@ -14,14 +14,21 @@ const detailsRsvpSummary = document.querySelector("#details-rsvp-summary");
 const addInviteeButton = document.querySelector("#add-invitee-button");
 const inviteeForm = document.querySelector("#invitee-form");
 const inviteeList = document.querySelector("#invitee-list");
+const addItineraryItemButton = document.querySelector("#add-itinerary-item-button");
+const itineraryForm = document.querySelector("#itinerary-form");
+const itineraryList = document.querySelector("#itinerary-list");
 
 let dashboardEvents = [];
 let inviteesByEvent = {};
+let itineraryItemsByEvent = {};
 let selectedEventId = null;
 let editingEventId = null;
 let editingInviteeId = null;
+let editingItineraryItemId = null;
 let loadingInviteeEventId = null;
+let loadingItineraryEventId = null;
 let inviteeLoadToken = 0;
+let itineraryLoadToken = 0;
 const SUPABASE_TIMEOUT_MS = 10000;
 const RSVP_STATUSES = ["Invited", "Going", "Maybe", "Not Going"];
 
@@ -72,6 +79,17 @@ function setEventFormLoading(isLoading) {
 
 function setInviteeFormLoading(isLoading) {
   const submitButton = inviteeForm?.querySelector("button[type='submit']");
+
+  if (!submitButton) {
+    return;
+  }
+
+  submitButton.disabled = isLoading;
+  submitButton.textContent = isLoading ? "Saving..." : submitButton.dataset.defaultText;
+}
+
+function setItineraryFormLoading(isLoading) {
+  const submitButton = itineraryForm?.querySelector("button[type='submit']");
 
   if (!submitButton) {
     return;
@@ -144,6 +162,33 @@ function setInviteeFormMode(mode, invitee = null) {
   inviteeForm.elements.rsvp_status.value = normalizeRsvpStatus(invitee.rsvp_status);
 }
 
+function setItineraryFormMode(mode, item = null) {
+  const isEditing = mode === "edit" && item;
+  const submitButton = itineraryForm?.querySelector("button[type='submit']");
+
+  editingItineraryItemId = isEditing ? item.id : null;
+
+  if (submitButton) {
+    submitButton.dataset.defaultText = isEditing ? "Save Changes" : "Save Item";
+    submitButton.textContent = submitButton.dataset.defaultText;
+  }
+
+  if (!itineraryForm) {
+    return;
+  }
+
+  if (!isEditing) {
+    itineraryForm.reset();
+    return;
+  }
+
+  itineraryForm.elements.activity_name.value = item.activity_name || "";
+  itineraryForm.elements.activity_time.value = item.activity_time || "";
+  itineraryForm.elements.location.value = item.location || "";
+  itineraryForm.elements.category.value = item.category || "";
+  itineraryForm.elements.notes.value = item.notes || "";
+}
+
 async function withTimeout(promise, message) {
   let timeoutId;
 
@@ -189,6 +234,22 @@ function toggleInviteeForm(isOpen) {
     inviteeForm.elements.name?.focus({ preventScroll: true });
   } else {
     setInviteeFormMode("create");
+  }
+}
+
+function toggleItineraryForm(isOpen) {
+  if (!itineraryForm) {
+    return;
+  }
+
+  itineraryForm.hidden = !isOpen;
+
+  if (isOpen) {
+    clearDashboardMessage();
+    itineraryForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    itineraryForm.elements.activity_name?.focus({ preventScroll: true });
+  } else {
+    setItineraryFormMode("create");
   }
 }
 
@@ -274,6 +335,10 @@ function getInviteesForEvent(eventId) {
   return inviteesByEvent[eventId] || [];
 }
 
+function getItineraryItemsForEvent(eventId) {
+  return itineraryItemsByEvent[eventId] || [];
+}
+
 function getRsvpSummary(eventId) {
   if (!eventId || !Object.prototype.hasOwnProperty.call(inviteesByEvent, eventId)) {
     return "Loading RSVP...";
@@ -307,8 +372,13 @@ function renderEventDetails(event) {
     if (addInviteeButton) {
       addInviteeButton.disabled = true;
     }
+    if (addItineraryItemButton) {
+      addItineraryItemButton.disabled = true;
+    }
     toggleInviteeForm(false);
+    toggleItineraryForm(false);
     renderInvitees(null);
+    renderItineraryItems(null);
     return;
   }
 
@@ -322,7 +392,11 @@ function renderEventDetails(event) {
   if (addInviteeButton) {
     addInviteeButton.disabled = false;
   }
+  if (addItineraryItemButton) {
+    addItineraryItemButton.disabled = false;
+  }
   renderInvitees(event);
+  renderItineraryItems(event);
 }
 
 function renderInvitees(event) {
@@ -413,14 +487,127 @@ function renderInvitees(event) {
   });
 }
 
+function renderItineraryItems(event) {
+  if (!itineraryList) {
+    return;
+  }
+
+  itineraryList.innerHTML = "";
+
+  if (!event) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "empty-state";
+    emptyState.textContent = "Select an event to view itinerary items.";
+    itineraryList.append(emptyState);
+    return;
+  }
+
+  if (loadingItineraryEventId === event.id) {
+    const loadingState = document.createElement("p");
+    loadingState.className = "empty-state";
+    loadingState.textContent = "Loading itinerary...";
+    itineraryList.append(loadingState);
+    return;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(itineraryItemsByEvent, event.id)) {
+    const waitingState = document.createElement("p");
+    waitingState.className = "empty-state";
+    waitingState.textContent = "Itinerary items will load for this event shortly.";
+    itineraryList.append(waitingState);
+    return;
+  }
+
+  const itineraryItems = getItineraryItemsForEvent(event.id);
+
+  if (!itineraryItems.length) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "empty-state";
+    emptyState.textContent = "No itinerary items yet.";
+    itineraryList.append(emptyState);
+    return;
+  }
+
+  itineraryItems.forEach((item) => {
+    const itemRow = document.createElement("article");
+    const details = document.createElement("div");
+    const title = document.createElement("strong");
+    const meta = document.createElement("div");
+    const actions = document.createElement("div");
+    const editButton = document.createElement("button");
+    const deleteButton = document.createElement("button");
+
+    itemRow.className = "itinerary-item";
+    details.className = "itinerary-details";
+    title.textContent = item.activity_name || "Untitled activity";
+    details.append(title);
+
+    meta.className = "itinerary-meta";
+
+    if (item.activity_time) {
+      const time = document.createElement("time");
+      time.dateTime = item.activity_time;
+      time.textContent = formatEventTime(item.activity_time);
+      meta.append(time);
+    }
+
+    if (item.location) {
+      const location = document.createElement("span");
+      location.className = "itinerary-location";
+      location.textContent = item.location;
+      meta.append(location);
+    }
+
+    if (item.category) {
+      const category = document.createElement("span");
+      category.className = "category-badge";
+      category.textContent = item.category;
+      meta.append(category);
+    }
+
+    if (meta.children.length) {
+      details.append(meta);
+    }
+
+    if (item.notes) {
+      const notes = document.createElement("span");
+      notes.className = "itinerary-notes";
+      notes.textContent = item.notes;
+      details.append(notes);
+    }
+
+    actions.className = "itinerary-actions";
+    editButton.className = "secondary-button compact-button";
+    editButton.type = "button";
+    editButton.textContent = "Edit";
+    editButton.setAttribute("aria-label", `Edit ${item.activity_name || "itinerary item"}`);
+    editButton.addEventListener("click", () => beginEditItineraryItem(item.id));
+
+    deleteButton.className = "secondary-button compact-button danger-button";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    deleteButton.setAttribute("aria-label", `Delete ${item.activity_name || "itinerary item"}`);
+    deleteButton.addEventListener("click", () => handleDeleteItineraryItem(item.id));
+
+    actions.append(editButton, deleteButton);
+    itemRow.append(details, actions);
+    itineraryList.append(itemRow);
+  });
+}
+
 function selectEvent(eventId) {
   selectedEventId = eventId;
   toggleInviteeForm(false);
+  toggleItineraryForm(false);
   renderEvents();
   renderEventDetails(getSelectedEvent());
 
   if (!Object.prototype.hasOwnProperty.call(inviteesByEvent, eventId)) {
     loadInviteesForEvent(eventId);
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(itineraryItemsByEvent, eventId)) {
+    loadItineraryItemsForEvent(eventId);
   }
 }
 
@@ -451,6 +638,20 @@ function beginEditInvitee(inviteeId) {
 
   setInviteeFormMode("edit", invitee);
   toggleInviteeForm(true);
+}
+
+function beginEditItineraryItem(itemId) {
+  const item = getItineraryItemsForEvent(selectedEventId).find(
+    (itineraryItem) => itineraryItem.id === itemId
+  );
+
+  if (!selectedEventId || !item) {
+    showDashboardMessage("Select an itinerary item before editing.", "error");
+    return;
+  }
+
+  setItineraryFormMode("edit", item);
+  toggleItineraryForm(true);
 }
 
 function renderEmptyEvents(message) {
@@ -691,6 +892,109 @@ async function loadInviteesForEvents(eventIds) {
   }
 }
 
+function groupItineraryItemsByEvent(items, eventIds = []) {
+  const groupedItems = {};
+
+  eventIds.forEach((eventId) => {
+    groupedItems[eventId] = [];
+  });
+
+  items.forEach((item) => {
+    if (!groupedItems[item.event_id]) {
+      groupedItems[item.event_id] = [];
+    }
+
+    groupedItems[item.event_id].push(item);
+  });
+
+  return groupedItems;
+}
+
+async function loadItineraryItemsForEvent(eventId) {
+  if (!eventId) {
+    return;
+  }
+
+  const token = ++itineraryLoadToken;
+  loadingItineraryEventId = eventId;
+  renderEventDetails(getSelectedEvent());
+
+  try {
+    await getAuthenticatedUser();
+    const { data, error } = await withTimeout(
+      dashboardClient
+        .from("itinerary_items")
+        .select("id,event_id,activity_name,activity_time,location,category,notes,created_at")
+        .eq("event_id", eventId)
+        .order("activity_time", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: true }),
+      "Loading itinerary items is taking too long. Please refresh and try again."
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    if (token !== itineraryLoadToken) {
+      return;
+    }
+
+    itineraryItemsByEvent = {
+      ...itineraryItemsByEvent,
+      [eventId]: groupItineraryItemsByEvent(data || [], [eventId])[eventId]
+    };
+    renderEventDetails(getSelectedEvent());
+  } catch (error) {
+    if (token === itineraryLoadToken) {
+      itineraryItemsByEvent = {
+        ...itineraryItemsByEvent,
+        [eventId]: []
+      };
+      showDashboardMessage(`Unable to load itinerary items: ${error.message}`, "error");
+      renderEventDetails(getSelectedEvent());
+    }
+  } finally {
+    if (token === itineraryLoadToken) {
+      loadingItineraryEventId = null;
+      renderEventDetails(getSelectedEvent());
+    }
+  }
+}
+
+async function loadItineraryItemsForEvents(eventIds) {
+  if (!eventIds.length) {
+    itineraryItemsByEvent = {};
+    return;
+  }
+
+  loadingItineraryEventId = selectedEventId;
+  renderEventDetails(getSelectedEvent());
+
+  try {
+    const { data, error } = await withTimeout(
+      dashboardClient
+        .from("itinerary_items")
+        .select("id,event_id,activity_name,activity_time,location,category,notes,created_at")
+        .in("event_id", eventIds)
+        .order("activity_time", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: true }),
+      "Loading itinerary items is taking too long. Please refresh and try again."
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    itineraryItemsByEvent = groupItineraryItemsByEvent(data || [], eventIds);
+  } catch (error) {
+    itineraryItemsByEvent = groupItineraryItemsByEvent([], eventIds);
+    showDashboardMessage(`Unable to load itinerary items: ${error.message}`, "error");
+  } finally {
+    loadingItineraryEventId = null;
+    renderEventDetails(getSelectedEvent());
+  }
+}
+
 async function loadDashboardEvents() {
   if (!dashboardShell) {
     return;
@@ -698,6 +1002,7 @@ async function loadDashboardEvents() {
 
   renderEmptyEvents("Loading your events...");
   inviteesByEvent = {};
+  itineraryItemsByEvent = {};
 
   try {
     const user = await getAuthenticatedUser();
@@ -720,10 +1025,12 @@ async function loadDashboardEvents() {
 
     if (dashboardEvents.length) {
       await loadInviteesForEvents(dashboardEvents.map((event) => event.id));
+      await loadItineraryItemsForEvents(dashboardEvents.map((event) => event.id));
     }
   } catch (error) {
     dashboardEvents = [];
     inviteesByEvent = {};
+    itineraryItemsByEvent = {};
     const isAuthError = error.message === "Please log in to manage events.";
     renderEmptyEvents(
       isAuthError ? "Log in to view your events." : "Unable to load events right now."
@@ -753,6 +1060,18 @@ function getInviteeFormValues() {
     email: String(formData.get("email") || "").trim(),
     phone: String(formData.get("phone") || "").trim(),
     rsvp_status: normalizeRsvpStatus(formData.get("rsvp_status"))
+  };
+}
+
+function getItineraryFormValues() {
+  const formData = new FormData(itineraryForm);
+
+  return {
+    activity_name: String(formData.get("activity_name") || "").trim(),
+    activity_time: String(formData.get("activity_time") || "") || null,
+    location: String(formData.get("location") || "").trim(),
+    category: String(formData.get("category") || "").trim(),
+    notes: String(formData.get("notes") || "").trim()
   };
 }
 
@@ -907,6 +1226,87 @@ async function handleInviteeSubmit(event) {
   }
 }
 
+async function handleItinerarySubmit(event) {
+  event.preventDefault();
+
+  if (!itineraryForm) {
+    return;
+  }
+
+  const selectedEvent = getSelectedEvent();
+
+  if (!selectedEvent) {
+    showDashboardMessage("Select an event before adding itinerary items.", "error");
+    return;
+  }
+
+  setItineraryFormLoading(true);
+  showDashboardMessage("Saving itinerary item...", "success");
+
+  try {
+    await getAuthenticatedUser();
+    const itemValues = getItineraryFormValues();
+    const isEditing = Boolean(editingItineraryItemId);
+    let error;
+
+    if (!itemValues.activity_name) {
+      throw new Error("Activity name is required.");
+    }
+
+    if (isEditing) {
+      const result = await withTimeout(
+        dashboardClient
+          .from("itinerary_items")
+          .update(itemValues)
+          .eq("id", editingItineraryItemId)
+          .eq("event_id", selectedEvent.id)
+          .select("id")
+          .maybeSingle(),
+        "Updating the itinerary item is taking too long. Please refresh and try again."
+      );
+
+      error = result.error;
+
+      if (error) {
+        throw error;
+      }
+
+      if (!result.data?.id) {
+        throw new Error("Itinerary item could not be updated. Please refresh and try again.");
+      }
+    } else {
+      const result = await withTimeout(
+        dashboardClient
+          .from("itinerary_items")
+          .insert({
+            ...itemValues,
+            event_id: selectedEvent.id
+          })
+          .select("id")
+          .single(),
+        "Creating the itinerary item is taking too long. Please refresh and try again."
+      );
+
+      error = result.error;
+    }
+
+    if (error) {
+      throw error;
+    }
+
+    toggleItineraryForm(false);
+    showDashboardMessage(
+      isEditing ? "Itinerary item updated successfully." : "Itinerary item added successfully.",
+      "success"
+    );
+    await loadItineraryItemsForEvent(selectedEvent.id);
+  } catch (error) {
+    showDashboardMessage(error.message, "error");
+  } finally {
+    setItineraryFormLoading(false);
+  }
+}
+
 async function handleDeleteEvent(eventId) {
   const event = dashboardEvents.find((dashboardEvent) => dashboardEvent.id === eventId);
   const eventName = event?.title || "this event";
@@ -1003,9 +1403,59 @@ async function handleDeleteInvitee(inviteeId) {
   }
 }
 
+async function handleDeleteItineraryItem(itemId) {
+  const selectedEvent = getSelectedEvent();
+  const item = getItineraryItemsForEvent(selectedEvent?.id).find(
+    (itineraryItem) => itineraryItem.id === itemId
+  );
+  const itemName = item?.activity_name || "this itinerary item";
+
+  if (!selectedEvent) {
+    showDashboardMessage("Select an event before deleting itinerary items.", "error");
+    return;
+  }
+
+  if (!window.confirm(`Delete "${itemName}" from ${selectedEvent.title}? This cannot be undone.`)) {
+    return;
+  }
+
+  showDashboardMessage("Deleting itinerary item...", "success");
+
+  try {
+    await getAuthenticatedUser();
+    const { data, error } = await withTimeout(
+      dashboardClient
+        .from("itinerary_items")
+        .delete()
+        .eq("id", itemId)
+        .eq("event_id", selectedEvent.id)
+        .select("id")
+        .maybeSingle(),
+      "Deleting the itinerary item is taking too long. Please refresh and try again."
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data?.id) {
+      throw new Error("Itinerary item could not be deleted. Please refresh and try again.");
+    }
+
+    if (editingItineraryItemId === itemId) {
+      toggleItineraryForm(false);
+    }
+
+    showDashboardMessage("Itinerary item deleted successfully.", "success");
+    await loadItineraryItemsForEvent(selectedEvent.id);
+  } catch (error) {
+    showDashboardMessage(error.message, "error");
+  }
+}
+
 document.addEventListener("click", (event) => {
   const eventAction = event.target.closest(
-    "#create-event-button, #cancel-event-button, #add-invitee-button, #cancel-invitee-button"
+    "#create-event-button, #cancel-event-button, #add-invitee-button, #cancel-invitee-button, #add-itinerary-item-button, #cancel-itinerary-item-button"
   );
 
   if (!eventAction) {
@@ -1034,9 +1484,26 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (eventAction.id === "add-itinerary-item-button") {
+    if (!getSelectedEvent()) {
+      showDashboardMessage("Select an event before adding itinerary items.", "error");
+      return;
+    }
+
+    setItineraryFormMode("create");
+    toggleItineraryForm(true);
+    return;
+  }
+
+  if (eventAction.id === "cancel-itinerary-item-button") {
+    toggleItineraryForm(false);
+    return;
+  }
+
   toggleEventForm(false);
 });
 eventForm?.addEventListener("submit", handleEventSubmit);
 inviteeForm?.addEventListener("submit", handleInviteeSubmit);
+itineraryForm?.addEventListener("submit", handleItinerarySubmit);
 
 loadDashboardEvents();
