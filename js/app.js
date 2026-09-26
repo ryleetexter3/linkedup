@@ -4,6 +4,8 @@ const dashboardClient = window.linkedUpSupabase;
 const dashboardShell = document.querySelector(".dashboard-shell");
 const dashboardMessage = document.querySelector("#auth-message");
 const createEventPanel = document.querySelector("#create-event-panel");
+const eventFormEyebrow = document.querySelector("#event-form-eyebrow");
+const eventFormTitle = document.querySelector("#create-event-title");
 const eventForm = document.querySelector("#event-form");
 const eventsSection = document.querySelector("#events");
 const detailsTitle = document.querySelector("#details-title");
@@ -11,6 +13,7 @@ const detailsDescription = document.querySelector("#details-description");
 
 let dashboardEvents = [];
 let selectedEventId = null;
+let editingEventId = null;
 const SUPABASE_TIMEOUT_MS = 10000;
 
 tabButtons.forEach((button) => {
@@ -58,6 +61,42 @@ function setEventFormLoading(isLoading) {
   submitButton.textContent = isLoading ? "Saving..." : submitButton.dataset.defaultText;
 }
 
+function setEventFormMode(mode, event = null) {
+  const isEditing = mode === "edit" && event;
+  const submitButton = eventForm?.querySelector("button[type='submit']");
+
+  editingEventId = isEditing ? event.id : null;
+
+  if (eventFormEyebrow) {
+    eventFormEyebrow.textContent = isEditing ? "Update plan" : "New plan";
+  }
+
+  if (eventFormTitle) {
+    eventFormTitle.textContent = isEditing ? "Edit Event" : "Create Event";
+  }
+
+  if (submitButton) {
+    submitButton.dataset.defaultText = isEditing ? "Save Changes" : "Save Event";
+    submitButton.textContent = submitButton.dataset.defaultText;
+  }
+
+  if (!eventForm) {
+    return;
+  }
+
+  if (!isEditing) {
+    eventForm.reset();
+    return;
+  }
+
+  eventForm.elements.title.value = event.title || "";
+  eventForm.elements.event_date.value = event.event_date || "";
+  eventForm.elements.start_time.value = event.start_time || "";
+  eventForm.elements.end_time.value = event.end_time || "";
+  eventForm.elements.location.value = event.location || "";
+  eventForm.elements.description.value = event.description || "";
+}
+
 async function withTimeout(promise, message) {
   let timeoutId;
 
@@ -85,6 +124,8 @@ function toggleEventForm(isOpen) {
     clearDashboardMessage();
     createEventPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     document.querySelector("#event-title")?.focus({ preventScroll: true });
+  } else {
+    setEventFormMode("create");
   }
 }
 
@@ -149,6 +190,21 @@ function selectEvent(eventId) {
   renderEventDetails(dashboardEvents.find((event) => event.id === selectedEventId));
 }
 
+function beginEditEvent(eventId) {
+  const event = dashboardEvents.find((dashboardEvent) => dashboardEvent.id === eventId);
+
+  if (!event) {
+    showDashboardMessage("Select an event before editing.", "error");
+    return;
+  }
+
+  selectedEventId = event.id;
+  renderEvents();
+  renderEventDetails(event);
+  setEventFormMode("edit", event);
+  toggleEventForm(true);
+}
+
 function renderEmptyEvents(message) {
   if (!eventsSection) {
     return;
@@ -197,6 +253,9 @@ function renderEvents() {
     const date = document.createElement("span");
     const title = document.createElement("h2");
     const facts = document.createElement("dl");
+    const actions = document.createElement("div");
+    const editButton = document.createElement("button");
+    const deleteButton = document.createElement("button");
 
     eventCard.className = `event-card${event.id === selectedEventId ? " selected" : ""}`;
     eventCard.tabIndex = 0;
@@ -218,10 +277,34 @@ function renderEvents() {
       createFact("Description", event.description || "No description yet.")
     );
 
-    eventCard.append(cardTopline, title, facts);
+    actions.className = "event-card-actions";
+    editButton.className = "secondary-button compact-button";
+    editButton.type = "button";
+    editButton.textContent = "Edit";
+    editButton.setAttribute("aria-label", `Edit ${event.title}`);
+    editButton.addEventListener("click", (buttonEvent) => {
+      buttonEvent.stopPropagation();
+      beginEditEvent(event.id);
+    });
+
+    deleteButton.className = "secondary-button compact-button danger-button";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    deleteButton.setAttribute("aria-label", `Delete ${event.title}`);
+    deleteButton.addEventListener("click", (buttonEvent) => {
+      buttonEvent.stopPropagation();
+      handleDeleteEvent(event.id);
+    });
+
+    actions.append(editButton, deleteButton);
+    eventCard.append(cardTopline, title, facts, actions);
 
     eventCard.addEventListener("click", () => selectEvent(event.id));
     eventCard.addEventListener("keydown", (eventKey) => {
+      if (eventKey.target !== eventCard) {
+        return;
+      }
+
       if (eventKey.key === "Enter" || eventKey.key === " ") {
         eventKey.preventDefault();
         selectEvent(event.id);
@@ -316,28 +399,106 @@ async function handleEventSubmit(event) {
   try {
     const user = await getAuthenticatedUser();
     const eventValues = getEventFormValues();
-    const { data, error } = await dashboardClient
-      .from("events")
-      .insert({
-        ...eventValues,
-        user_id: user.id
-      })
-      .select("id")
-      .single();
+    const isEditing = Boolean(editingEventId);
+    let savedEventId = editingEventId;
+    let error;
+
+    if (isEditing) {
+      const result = await withTimeout(
+        dashboardClient
+          .from("events")
+          .update(eventValues)
+          .eq("id", editingEventId)
+          .eq("user_id", user.id)
+          .select("id")
+          .maybeSingle(),
+        "Updating the event is taking too long. Please refresh and try again."
+      );
+
+      error = result.error;
+      savedEventId = result.data?.id || savedEventId;
+    } else {
+      const result = await withTimeout(
+        dashboardClient
+          .from("events")
+          .insert({
+            ...eventValues,
+            user_id: user.id
+          })
+          .select("id")
+          .single(),
+        "Creating the event is taking too long. Please refresh and try again."
+      );
+
+      error = result.error;
+      savedEventId = result.data?.id;
+    }
 
     if (error) {
       throw error;
     }
 
-    selectedEventId = data.id;
-    eventForm.reset();
+    if (!savedEventId) {
+      throw new Error("Event could not be saved. Please refresh and try again.");
+    }
+
+    selectedEventId = savedEventId;
     toggleEventForm(false);
-    showDashboardMessage("Event created successfully.", "success");
+    showDashboardMessage(
+      isEditing ? "Event updated successfully." : "Event created successfully.",
+      "success"
+    );
     await loadDashboardEvents();
   } catch (error) {
     showDashboardMessage(error.message, "error");
   } finally {
     setEventFormLoading(false);
+  }
+}
+
+async function handleDeleteEvent(eventId) {
+  const event = dashboardEvents.find((dashboardEvent) => dashboardEvent.id === eventId);
+  const eventName = event?.title || "this event";
+
+  if (!window.confirm(`Delete "${eventName}"? This cannot be undone.`)) {
+    return;
+  }
+
+  showDashboardMessage("Deleting event...", "success");
+
+  try {
+    const user = await getAuthenticatedUser();
+    const { data, error } = await withTimeout(
+      dashboardClient
+        .from("events")
+        .delete()
+        .eq("id", eventId)
+        .eq("user_id", user.id)
+        .select("id")
+        .maybeSingle(),
+      "Deleting the event is taking too long. Please refresh and try again."
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data?.id) {
+      throw new Error("Event could not be deleted. Please refresh and try again.");
+    }
+
+    if (selectedEventId === eventId) {
+      selectedEventId = null;
+    }
+
+    if (editingEventId === eventId) {
+      toggleEventForm(false);
+    }
+
+    showDashboardMessage("Event deleted successfully.", "success");
+    await loadDashboardEvents();
+  } catch (error) {
+    showDashboardMessage(error.message, "error");
   }
 }
 
@@ -348,7 +509,13 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  toggleEventForm(eventAction.id === "create-event-button");
+  if (eventAction.id === "create-event-button") {
+    setEventFormMode("create");
+    toggleEventForm(true);
+    return;
+  }
+
+  toggleEventForm(false);
 });
 eventForm?.addEventListener("submit", handleEventSubmit);
 

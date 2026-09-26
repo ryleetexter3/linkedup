@@ -429,6 +429,27 @@ textarea:focus {
   gap: 0.75rem;
 }
 
+.event-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.compact-button {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.8rem;
+}
+
+.danger-button {
+  border-color: #fecdd3;
+  color: var(--danger);
+}
+
+.danger-button:hover {
+  background: #fff1f2;
+}
+
 dt {
   color: var(--muted);
   font-weight: 700;
@@ -566,6 +587,7 @@ dd {
 
   .dashboard-header,
   .hero-band,
+  .event-card-actions,
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
@@ -593,6 +615,11 @@ dd {
   .action-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .event-card-actions,
+  .event-card-actions .secondary-button {
+    width: 100%;
   }
 
   .event-facts div,
