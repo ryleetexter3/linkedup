@@ -32,12 +32,17 @@ a {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
 button {
   cursor: pointer;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 .auth-page {
@@ -205,7 +210,8 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -213,7 +219,13 @@ input {
   color: var(--ink);
 }
 
-input:focus {
+textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus {
   border-color: var(--brand);
   outline: 3px solid rgba(15, 118, 110, 0.16);
 }
@@ -292,7 +304,8 @@ input:focus {
 .hero-band,
 .details-panel,
 .itinerary-panel,
-.event-card {
+.event-card,
+.create-event-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -318,6 +331,30 @@ input:focus {
   color: var(--muted);
 }
 
+.create-event-panel {
+  margin-top: 1rem;
+  padding: 1.25rem;
+}
+
+.event-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1rem;
+}
+
+.event-form label {
+  display: block;
+}
+
+.full-width-field {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .events-section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -327,10 +364,27 @@ input:focus {
 
 .event-card {
   padding: 1.25rem;
+  cursor: pointer;
 }
 
 .event-card.selected {
   border-color: rgba(15, 118, 110, 0.5);
+}
+
+.event-card:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.2);
+  outline-offset: 2px;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  margin: 0;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  background: #f8fafc;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .card-topline,
@@ -501,7 +555,8 @@ dd {
 
   .auth-shell,
   .details-layout,
-  .events-section {
+  .events-section,
+  .event-form {
     grid-template-columns: 1fr;
   }
 
@@ -522,6 +577,7 @@ dd {
   }
 
   .hero-band .primary-action,
+  .form-actions .primary-action,
   .secondary-button {
     width: 100%;
   }

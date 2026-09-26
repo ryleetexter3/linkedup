@@ -25,99 +25,72 @@
         <h1 id="dashboard-title">My Events</h1>
         <p>Keep upcoming hangouts, invitees, RSVP updates, and itinerary stops easy to scan.</p>
       </div>
-      <button class="primary-action" type="button">Create Event</button>
+      <button class="primary-action" id="create-event-button" type="button">Create Event</button>
+    </section>
+
+    <section class="create-event-panel" id="create-event-panel" aria-labelledby="create-event-title" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">New plan</p>
+          <h2 id="create-event-title">Create Event</h2>
+        </div>
+        <button class="secondary-button" id="cancel-event-button" type="button">Cancel</button>
+      </div>
+
+      <form class="event-form" id="event-form">
+        <div>
+          <label for="event-title">Event title</label>
+          <input id="event-title" name="title" type="text" placeholder="Downtown Food Crawl" required>
+        </div>
+
+        <div>
+          <label for="event-date">Date</label>
+          <input id="event-date" name="event_date" type="date" required>
+        </div>
+
+        <div>
+          <label for="start-time">Start time</label>
+          <input id="start-time" name="start_time" type="time" required>
+        </div>
+
+        <div>
+          <label for="end-time">End time</label>
+          <input id="end-time" name="end_time" type="time" required>
+        </div>
+
+        <div>
+          <label for="event-location">Main location</label>
+          <input id="event-location" name="location" type="text" placeholder="Atlantic Ave, Delray Beach" required>
+        </div>
+
+        <div class="full-width-field">
+          <label for="event-description">Description</label>
+          <textarea id="event-description" name="description" rows="4" placeholder="What should everyone know about the plan?"></textarea>
+        </div>
+
+        <div class="form-actions full-width-field">
+          <button class="primary-action" type="submit">Save Event</button>
+        </div>
+      </form>
     </section>
 
     <section class="events-section" id="events" aria-label="Upcoming events">
-      <article class="event-card selected">
-        <div class="card-topline">
-          <span class="status-pill">Next up</span>
-          <span>Sat, Oct 4, 2026</span>
-        </div>
-        <h2>Downtown Food Crawl</h2>
-        <dl class="event-facts">
-          <div>
-            <dt>Time</dt>
-            <dd>5:30 PM - 9:45 PM</dd>
-          </div>
-          <div>
-            <dt>Location</dt>
-            <dd>Atlantic Ave, Delray Beach</dd>
-          </div>
-          <div>
-            <dt>RSVPs</dt>
-            <dd>4 going, 1 maybe, 1 invited</dd>
-          </div>
-        </dl>
-      </article>
-
-      <article class="event-card">
-        <div class="card-topline">
-          <span class="status-pill muted">Planning</span>
-          <span>Fri, Oct 17, 2026</span>
-        </div>
-        <h2>Movie Night and Late Snacks</h2>
-        <dl class="event-facts">
-          <div>
-            <dt>Time</dt>
-            <dd>7:00 PM - 11:00 PM</dd>
-          </div>
-          <div>
-            <dt>Location</dt>
-            <dd>Living Room Theater</dd>
-          </div>
-          <div>
-            <dt>RSVPs</dt>
-            <dd>3 going, 2 invited, 1 not going</dd>
-          </div>
-        </dl>
-      </article>
+      <p class="empty-state">Loading your events...</p>
     </section>
 
     <section class="details-layout" id="details" aria-labelledby="details-title">
       <article class="details-panel">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Sample event details</p>
-            <h2 id="details-title">Downtown Food Crawl</h2>
-          </div>
-          <div class="action-row">
-            <button class="icon-button" type="button" aria-label="Edit event">Edit</button>
-            <button class="icon-button danger" type="button" aria-label="Delete event">Delete</button>
+            <p class="eyebrow">Event details</p>
+            <h2 id="details-title">Select an event</h2>
           </div>
         </div>
-        <p class="description">A relaxed Saturday plan to try a few different food spots downtown, then end with dessert and a quick walk near the avenue.</p>
+        <p class="description" id="details-description">Create an event or choose one from your dashboard to see its details here.</p>
 
         <h3>Invitees</h3>
         <div class="invitee-list" aria-label="Invitees and RSVP statuses">
-          <div class="invitee-row">
-            <div>
-              <strong>Maya Johnson</strong>
-              <span>maya@example.com</span>
-            </div>
-            <span class="rsvp going">Going</span>
-          </div>
-          <div class="invitee-row">
-            <div>
-              <strong>Chris Lee</strong>
-              <span>chris@example.com | (555) 014-8821</span>
-            </div>
-            <span class="rsvp maybe">Maybe</span>
-          </div>
-          <div class="invitee-row">
-            <div>
-              <strong>Ari Patel</strong>
-              <span>ari@example.com</span>
-            </div>
-            <span class="rsvp invited">Invited</span>
-          </div>
-          <div class="invitee-row">
-            <div>
-              <strong>Jordan Smith</strong>
-              <span>jordan@example.com | (555) 019-4410</span>
-            </div>
-            <span class="rsvp no">Not Going</span>
-          </div>
+          <p class="empty-state">Invitees will be added in a later step.</p>
         </div>
       </article>
 
@@ -127,48 +100,10 @@
             <p class="eyebrow">Planned stops</p>
             <h2 id="itinerary-title">Itinerary</h2>
           </div>
-          <button class="secondary-button" type="button">Add Item</button>
         </div>
 
         <div class="itinerary-list">
-          <article class="itinerary-item">
-            <time datetime="17:30">5:30 PM</time>
-            <div>
-              <h3>Meet at the fountain</h3>
-              <p class="meta">Atlantic Ave Plaza | Meetup</p>
-              <p>Check who has arrived and decide the walking order for the food stops.</p>
-              <div class="action-row">
-                <button class="text-button" type="button">Edit</button>
-                <button class="text-button danger" type="button">Delete</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="itinerary-item">
-            <time datetime="18:00">6:00 PM</time>
-            <div>
-              <h3>Taco stop</h3>
-              <p class="meta">Tacoria Central | Food</p>
-              <p>Grab small plates so everyone still has room for dessert later.</p>
-              <div class="action-row">
-                <button class="text-button" type="button">Edit</button>
-                <button class="text-button danger" type="button">Delete</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="itinerary-item">
-            <time datetime="20:45">8:45 PM</time>
-            <div>
-              <h3>Dessert and recap</h3>
-              <p class="meta">Sweet Spot Cafe | Dessert</p>
-              <p>End the night with dessert, photos, and a quick vote for the next hangout.</p>
-              <div class="action-row">
-                <button class="text-button" type="button">Edit</button>
-                <button class="text-button danger" type="button">Delete</button>
-              </div>
-            </div>
-          </article>
+          <p class="empty-state">Itinerary items will be added in a later step.</p>
         </div>
       </aside>
     </section>
