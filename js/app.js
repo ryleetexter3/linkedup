@@ -3,8 +3,6 @@ const authPanels = document.querySelectorAll("[data-auth-panel]");
 const dashboardClient = window.linkedUpSupabase;
 const dashboardShell = document.querySelector(".dashboard-shell");
 const dashboardMessage = document.querySelector("#auth-message");
-const createEventButton = document.querySelector("#create-event-button");
-const cancelEventButton = document.querySelector("#cancel-event-button");
 const createEventPanel = document.querySelector("#create-event-panel");
 const eventForm = document.querySelector("#event-form");
 const eventsSection = document.querySelector("#events");
@@ -68,7 +66,8 @@ function toggleEventForm(isOpen) {
 
   if (isOpen) {
     clearDashboardMessage();
-    document.querySelector("#event-title")?.focus();
+    createEventPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelector("#event-title")?.focus({ preventScroll: true });
   }
 }
 
@@ -316,8 +315,15 @@ async function handleEventSubmit(event) {
   }
 }
 
-createEventButton?.addEventListener("click", () => toggleEventForm(true));
-cancelEventButton?.addEventListener("click", () => toggleEventForm(false));
+document.addEventListener("click", (event) => {
+  const eventAction = event.target.closest("#create-event-button, #cancel-event-button");
+
+  if (!eventAction) {
+    return;
+  }
+
+  toggleEventForm(eventAction.id === "create-event-button");
+});
 eventForm?.addEventListener("submit", handleEventSubmit);
 
 loadDashboardEvents();
