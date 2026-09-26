@@ -11,6 +11,7 @@ const detailsDescription = document.querySelector("#details-description");
 
 let dashboardEvents = [];
 let selectedEventId = null;
+const SUPABASE_TIMEOUT_MS = 10000;
 
 tabButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -55,6 +56,22 @@ function setEventFormLoading(isLoading) {
 
   submitButton.disabled = isLoading;
   submitButton.textContent = isLoading ? "Saving..." : submitButton.dataset.defaultText;
+}
+
+async function withTimeout(promise, message) {
+  let timeoutId;
+
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, SUPABASE_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 function toggleEventForm(isOpen) {
@@ -222,17 +239,20 @@ async function getAuthenticatedUser() {
     throw new Error("Supabase is not configured yet.");
   }
 
-  const { data, error } = await dashboardClient.auth.getUser();
+  const { data, error } = await withTimeout(
+    dashboardClient.auth.getSession(),
+    "Authentication is taking too long. Please refresh and try again."
+  );
 
   if (error) {
     throw error;
   }
 
-  if (!data.user) {
+  if (!data.session?.user) {
     throw new Error("Please log in to manage events.");
   }
 
-  return data.user;
+  return data.session.user;
 }
 
 async function loadDashboardEvents() {
@@ -244,12 +264,15 @@ async function loadDashboardEvents() {
 
   try {
     const user = await getAuthenticatedUser();
-    const { data, error } = await dashboardClient
-      .from("events")
-      .select("id,user_id,title,event_date,start_time,end_time,location,description,created_at")
-      .eq("user_id", user.id)
-      .order("event_date", { ascending: true })
-      .order("start_time", { ascending: true });
+    const { data, error } = await withTimeout(
+      dashboardClient
+        .from("events")
+        .select("id,user_id,title,event_date,start_time,end_time,location,description,created_at")
+        .eq("user_id", user.id)
+        .order("event_date", { ascending: true })
+        .order("start_time", { ascending: true }),
+      "Loading events is taking too long. Please refresh and try again."
+    );
 
     if (error) {
       throw error;
@@ -259,7 +282,10 @@ async function loadDashboardEvents() {
     renderEvents();
   } catch (error) {
     dashboardEvents = [];
-    renderEmptyEvents("Log in to view your events.");
+    const isAuthError = error.message === "Please log in to manage events.";
+    renderEmptyEvents(
+      isAuthError ? "Log in to view your events." : "Unable to load events right now."
+    );
     showDashboardMessage(error.message, "error");
   }
 }
