@@ -214,6 +214,7 @@ label {
 input,
 select,
 textarea {
+  min-width: 0;
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -339,16 +340,25 @@ textarea:focus {
   padding: 1.25rem;
 }
 
-.event-form,
-.invitee-form {
+.event-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 1rem;
 }
 
-.event-form label,
+.invitee-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+}
+
+.event-form label {
+  display: block;
+}
+
 .invitee-form label {
   display: block;
+  margin-top: 0;
 }
 
 .full-width-field {
@@ -476,8 +486,17 @@ dd {
   padding: 1.25rem;
 }
 
+.details-panel {
+  display: grid;
+  gap: 0.95rem;
+}
+
 .section-heading {
   margin-bottom: 1rem;
+}
+
+.details-panel .section-heading {
+  margin-bottom: 0;
 }
 
 .section-heading h2 {
@@ -485,13 +504,20 @@ dd {
 }
 
 .description {
+  margin-bottom: 0;
   color: var(--muted);
+}
+
+#details-rsvp-summary {
+  margin: -0.35rem 0 0;
+  color: var(--brand-dark);
+  font-weight: 700;
 }
 
 .invitee-list,
 .itinerary-list {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .invitee-heading {
@@ -499,8 +525,9 @@ dd {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-top: 1.5rem;
-  margin-bottom: 0.75rem;
+  margin-top: 0.35rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--line);
 }
 
 .invitee-heading h3 {
@@ -508,26 +535,41 @@ dd {
 }
 
 .invitee-form {
-  margin-bottom: 1rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 1rem;
   background: #f8fafc;
 }
 
+.invitee-form > div {
+  min-width: 0;
+}
+
 .invitee-form .form-actions {
-  gap: 0.65rem;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.invitee-form .primary-action {
+  margin-top: 0;
+}
+
+.invitee-form .compact-button {
+  min-width: 8.5rem;
 }
 
 .invitee-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem;
+  gap: 0.85rem;
+  padding: 0.7rem 0.85rem;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 .invitee-row strong,
@@ -536,13 +578,25 @@ dd {
 }
 
 .invitee-details {
+  display: grid;
+  gap: 0.12rem;
   min-width: 0;
+}
+
+.invitee-details strong {
+  line-height: 1.25;
+}
+
+.invitee-email,
+.invitee-phone {
+  overflow-wrap: anywhere;
 }
 
 .invitee-actions {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  justify-content: flex-end;
+  gap: 0.45rem;
 }
 
 .invitee-row div span,
@@ -552,7 +606,9 @@ dd {
 }
 
 .rsvp {
-  padding: 0.25rem 0.65rem;
+  min-height: 1.75rem;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.78rem;
 }
 
 .rsvp.going {
@@ -646,6 +702,18 @@ dd {
   .secondary-button {
     width: 100%;
   }
+
+  .invitee-heading .secondary-button,
+  .invitee-actions .secondary-button,
+  .invitee-form .form-actions .primary-action,
+  .invitee-form .form-actions .secondary-button {
+    width: auto;
+  }
+
+  .invitee-form .form-actions .primary-action,
+  .invitee-form .form-actions .secondary-button {
+    flex: 1;
+  }
 }
 
 @media (max-width: 560px) {
@@ -656,7 +724,6 @@ dd {
   .card-topline,
   .invitee-row,
   .invitee-heading,
-  .invitee-actions,
   .action-row {
     align-items: flex-start;
     flex-direction: column;
@@ -666,6 +733,32 @@ dd {
   .event-card-actions .secondary-button,
   .invitee-actions {
     width: 100%;
+  }
+
+  .invitee-heading .secondary-button,
+  .invitee-form .form-actions .primary-action,
+  .invitee-form .form-actions .secondary-button {
+    width: 100%;
+  }
+
+  .invitee-row {
+    grid-template-columns: 1fr;
+  }
+
+  .invitee-actions {
+    flex-wrap: wrap;
+  }
+
+  .invitee-actions .secondary-button {
+    width: auto;
+  }
+
+  .invitee-form .form-actions {
+    flex-direction: column;
+  }
+
+  .invitee-form .compact-button {
+    min-width: 0;
   }
 
   .event-facts div,

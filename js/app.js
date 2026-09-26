@@ -380,10 +380,16 @@ function renderInvitees(event) {
 
     inviteeRow.className = "invitee-row";
     details.className = "invitee-details";
+    email.className = "invitee-email";
+    phone.className = "invitee-phone";
     name.textContent = invitee.name || "Unnamed invitee";
     email.textContent = invitee.email || "No email provided";
-    phone.textContent = invitee.phone ? invitee.phone : "No phone provided";
-    details.append(name, email, phone);
+    details.append(name, email);
+
+    if (invitee.phone) {
+      phone.textContent = invitee.phone;
+      details.append(phone);
+    }
 
     actions.className = "invitee-actions";
     rsvp.className = `rsvp ${getRsvpClass(status)}`;
