@@ -8,6 +8,7 @@ const eventFormEyebrow = document.querySelector("#event-form-eyebrow");
 const eventFormTitle = document.querySelector("#create-event-title");
 const eventForm = document.querySelector("#event-form");
 const eventsSection = document.querySelector("#events");
+const detailsEyebrow = document.querySelector("#details-eyebrow");
 const detailsTitle = document.querySelector("#details-title");
 const detailsDescription = document.querySelector("#details-description");
 const detailsRsvpSummary = document.querySelector("#details-rsvp-summary");
@@ -15,6 +16,7 @@ const addInviteeButton = document.querySelector("#add-invitee-button");
 const inviteeForm = document.querySelector("#invitee-form");
 const inviteeList = document.querySelector("#invitee-list");
 const addItineraryItemButton = document.querySelector("#add-itinerary-item-button");
+const itineraryTitle = document.querySelector("#itinerary-title");
 const itineraryForm = document.querySelector("#itinerary-form");
 const itineraryList = document.querySelector("#itinerary-list");
 
@@ -364,8 +366,14 @@ function renderEventDetails(event) {
   }
 
   if (!event) {
+    if (detailsEyebrow) {
+      detailsEyebrow.textContent = "Event details";
+    }
     detailsTitle.textContent = "Select an event";
     detailsDescription.textContent = "Create an event or choose one from your dashboard to see its details here.";
+    if (itineraryTitle) {
+      itineraryTitle.textContent = "Itinerary";
+    }
     if (detailsRsvpSummary) {
       detailsRsvpSummary.textContent = "";
     }
@@ -382,10 +390,16 @@ function renderEventDetails(event) {
     return;
   }
 
+  if (detailsEyebrow) {
+    detailsEyebrow.textContent = "Selected event details";
+  }
   detailsTitle.textContent = event.title;
   detailsDescription.textContent =
     event.description ||
     `${formatEventDate(event.event_date)} at ${getEventTimeRange(event)} in ${event.location}.`;
+  if (itineraryTitle) {
+    itineraryTitle.textContent = `Itinerary for ${event.title}`;
+  }
   if (detailsRsvpSummary) {
     detailsRsvpSummary.textContent = getRsvpSummary(event.id);
   }
@@ -706,14 +720,16 @@ function renderEvents() {
     const editButton = document.createElement("button");
     const deleteButton = document.createElement("button");
 
-    eventCard.className = `event-card${event.id === selectedEventId ? " selected" : ""}`;
+    const isSelected = event.id === selectedEventId;
+
+    eventCard.className = `event-card${isSelected ? " selected" : ""}`;
     eventCard.tabIndex = 0;
     eventCard.setAttribute("role", "button");
-    eventCard.setAttribute("aria-pressed", String(event.id === selectedEventId));
+    eventCard.setAttribute("aria-pressed", String(isSelected));
 
     cardTopline.className = "card-topline";
-    status.className = `status-pill${index === 0 ? "" : " muted"}`;
-    status.textContent = index === 0 ? "Next up" : "Planning";
+    status.className = `status-pill${isSelected || index === 0 ? "" : " muted"}`;
+    status.textContent = isSelected ? "Selected Event" : index === 0 ? "Next up" : "Planning";
     date.textContent = formatEventDate(event.event_date);
     cardTopline.append(status, date);
 
