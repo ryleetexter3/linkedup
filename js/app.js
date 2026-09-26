@@ -10,11 +10,20 @@ const eventForm = document.querySelector("#event-form");
 const eventsSection = document.querySelector("#events");
 const detailsTitle = document.querySelector("#details-title");
 const detailsDescription = document.querySelector("#details-description");
+const detailsRsvpSummary = document.querySelector("#details-rsvp-summary");
+const addInviteeButton = document.querySelector("#add-invitee-button");
+const inviteeForm = document.querySelector("#invitee-form");
+const inviteeList = document.querySelector("#invitee-list");
 
 let dashboardEvents = [];
+let inviteesByEvent = {};
 let selectedEventId = null;
 let editingEventId = null;
+let editingInviteeId = null;
+let loadingInviteeEventId = null;
+let inviteeLoadToken = 0;
 const SUPABASE_TIMEOUT_MS = 10000;
+const RSVP_STATUSES = ["Invited", "Going", "Maybe", "Not Going"];
 
 tabButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -61,6 +70,17 @@ function setEventFormLoading(isLoading) {
   submitButton.textContent = isLoading ? "Saving..." : submitButton.dataset.defaultText;
 }
 
+function setInviteeFormLoading(isLoading) {
+  const submitButton = inviteeForm?.querySelector("button[type='submit']");
+
+  if (!submitButton) {
+    return;
+  }
+
+  submitButton.disabled = isLoading;
+  submitButton.textContent = isLoading ? "Saving..." : submitButton.dataset.defaultText;
+}
+
 function setEventFormMode(mode, event = null) {
   const isEditing = mode === "edit" && event;
   const submitButton = eventForm?.querySelector("button[type='submit']");
@@ -97,6 +117,33 @@ function setEventFormMode(mode, event = null) {
   eventForm.elements.description.value = event.description || "";
 }
 
+function setInviteeFormMode(mode, invitee = null) {
+  const isEditing = mode === "edit" && invitee;
+  const submitButton = inviteeForm?.querySelector("button[type='submit']");
+
+  editingInviteeId = isEditing ? invitee.id : null;
+
+  if (submitButton) {
+    submitButton.dataset.defaultText = isEditing ? "Save Changes" : "Save Invitee";
+    submitButton.textContent = submitButton.dataset.defaultText;
+  }
+
+  if (!inviteeForm) {
+    return;
+  }
+
+  if (!isEditing) {
+    inviteeForm.reset();
+    inviteeForm.elements.rsvp_status.value = "Invited";
+    return;
+  }
+
+  inviteeForm.elements.name.value = invitee.name || "";
+  inviteeForm.elements.email.value = invitee.email || "";
+  inviteeForm.elements.phone.value = invitee.phone || "";
+  inviteeForm.elements.rsvp_status.value = normalizeRsvpStatus(invitee.rsvp_status);
+}
+
 async function withTimeout(promise, message) {
   let timeoutId;
 
@@ -126,6 +173,22 @@ function toggleEventForm(isOpen) {
     document.querySelector("#event-title")?.focus({ preventScroll: true });
   } else {
     setEventFormMode("create");
+  }
+}
+
+function toggleInviteeForm(isOpen) {
+  if (!inviteeForm) {
+    return;
+  }
+
+  inviteeForm.hidden = !isOpen;
+
+  if (isOpen) {
+    clearDashboardMessage();
+    inviteeForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    inviteeForm.elements.name?.focus({ preventScroll: true });
+  } else {
+    setInviteeFormMode("create");
   }
 }
 
@@ -167,6 +230,69 @@ function getEventTimeRange(event) {
   return `${formatEventTime(event.start_time)} - ${formatEventTime(event.end_time)}`;
 }
 
+function getSelectedEvent() {
+  return dashboardEvents.find((event) => event.id === selectedEventId) || null;
+}
+
+function normalizeRsvpStatus(status) {
+  const normalizedStatus = String(status || "Invited").trim().toLowerCase().replace(/[_-]/g, " ");
+
+  if (normalizedStatus === "going") {
+    return "Going";
+  }
+
+  if (normalizedStatus === "maybe") {
+    return "Maybe";
+  }
+
+  if (normalizedStatus === "not going" || normalizedStatus === "no" || normalizedStatus === "declined") {
+    return "Not Going";
+  }
+
+  return "Invited";
+}
+
+function getRsvpClass(status) {
+  const normalizedStatus = normalizeRsvpStatus(status);
+
+  if (normalizedStatus === "Going") {
+    return "going";
+  }
+
+  if (normalizedStatus === "Maybe") {
+    return "maybe";
+  }
+
+  if (normalizedStatus === "Not Going") {
+    return "no";
+  }
+
+  return "invited";
+}
+
+function getInviteesForEvent(eventId) {
+  return inviteesByEvent[eventId] || [];
+}
+
+function getRsvpSummary(eventId) {
+  if (!eventId || !Object.prototype.hasOwnProperty.call(inviteesByEvent, eventId)) {
+    return "Loading RSVP...";
+  }
+
+  const invitees = getInviteesForEvent(eventId);
+
+  if (!invitees.length) {
+    return "No invitees yet";
+  }
+
+  return RSVP_STATUSES.map((status) => {
+    const count = invitees.filter((invitee) => normalizeRsvpStatus(invitee.rsvp_status) === status).length;
+    return count ? `${count} ${status}` : "";
+  })
+    .filter(Boolean)
+    .join(" • ");
+}
+
 function renderEventDetails(event) {
   if (!detailsTitle || !detailsDescription) {
     return;
@@ -175,6 +301,14 @@ function renderEventDetails(event) {
   if (!event) {
     detailsTitle.textContent = "Select an event";
     detailsDescription.textContent = "Create an event or choose one from your dashboard to see its details here.";
+    if (detailsRsvpSummary) {
+      detailsRsvpSummary.textContent = "";
+    }
+    if (addInviteeButton) {
+      addInviteeButton.disabled = true;
+    }
+    toggleInviteeForm(false);
+    renderInvitees(null);
     return;
   }
 
@@ -182,12 +316,106 @@ function renderEventDetails(event) {
   detailsDescription.textContent =
     event.description ||
     `${formatEventDate(event.event_date)} at ${getEventTimeRange(event)} in ${event.location}.`;
+  if (detailsRsvpSummary) {
+    detailsRsvpSummary.textContent = getRsvpSummary(event.id);
+  }
+  if (addInviteeButton) {
+    addInviteeButton.disabled = false;
+  }
+  renderInvitees(event);
+}
+
+function renderInvitees(event) {
+  if (!inviteeList) {
+    return;
+  }
+
+  inviteeList.innerHTML = "";
+
+  if (!event) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "empty-state";
+    emptyState.textContent = "Select an event to view invitees.";
+    inviteeList.append(emptyState);
+    return;
+  }
+
+  if (loadingInviteeEventId === event.id) {
+    const loadingState = document.createElement("p");
+    loadingState.className = "empty-state";
+    loadingState.textContent = "Loading invitees...";
+    inviteeList.append(loadingState);
+    return;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(inviteesByEvent, event.id)) {
+    const waitingState = document.createElement("p");
+    waitingState.className = "empty-state";
+    waitingState.textContent = "Invitees will load for this event shortly.";
+    inviteeList.append(waitingState);
+    return;
+  }
+
+  const invitees = getInviteesForEvent(event.id);
+
+  if (!invitees.length) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "empty-state";
+    emptyState.textContent = "No one has been invited yet.";
+    inviteeList.append(emptyState);
+    return;
+  }
+
+  invitees.forEach((invitee) => {
+    const inviteeRow = document.createElement("article");
+    const details = document.createElement("div");
+    const name = document.createElement("strong");
+    const email = document.createElement("span");
+    const phone = document.createElement("span");
+    const actions = document.createElement("div");
+    const rsvp = document.createElement("span");
+    const editButton = document.createElement("button");
+    const deleteButton = document.createElement("button");
+    const status = normalizeRsvpStatus(invitee.rsvp_status);
+
+    inviteeRow.className = "invitee-row";
+    details.className = "invitee-details";
+    name.textContent = invitee.name || "Unnamed invitee";
+    email.textContent = invitee.email || "No email provided";
+    phone.textContent = invitee.phone ? invitee.phone : "No phone provided";
+    details.append(name, email, phone);
+
+    actions.className = "invitee-actions";
+    rsvp.className = `rsvp ${getRsvpClass(status)}`;
+    rsvp.textContent = status;
+
+    editButton.className = "secondary-button compact-button";
+    editButton.type = "button";
+    editButton.textContent = "Edit";
+    editButton.setAttribute("aria-label", `Edit ${invitee.name || "invitee"}`);
+    editButton.addEventListener("click", () => beginEditInvitee(invitee.id));
+
+    deleteButton.className = "secondary-button compact-button danger-button";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    deleteButton.setAttribute("aria-label", `Delete ${invitee.name || "invitee"}`);
+    deleteButton.addEventListener("click", () => handleDeleteInvitee(invitee.id));
+
+    actions.append(rsvp, editButton, deleteButton);
+    inviteeRow.append(details, actions);
+    inviteeList.append(inviteeRow);
+  });
 }
 
 function selectEvent(eventId) {
   selectedEventId = eventId;
+  toggleInviteeForm(false);
   renderEvents();
-  renderEventDetails(dashboardEvents.find((event) => event.id === selectedEventId));
+  renderEventDetails(getSelectedEvent());
+
+  if (!Object.prototype.hasOwnProperty.call(inviteesByEvent, eventId)) {
+    loadInviteesForEvent(eventId);
+  }
 }
 
 function beginEditEvent(eventId) {
@@ -203,6 +431,20 @@ function beginEditEvent(eventId) {
   renderEventDetails(event);
   setEventFormMode("edit", event);
   toggleEventForm(true);
+}
+
+function beginEditInvitee(inviteeId) {
+  const invitee = getInviteesForEvent(selectedEventId).find(
+    (eventInvitee) => eventInvitee.id === inviteeId
+  );
+
+  if (!selectedEventId || !invitee) {
+    showDashboardMessage("Select an invitee before editing.", "error");
+    return;
+  }
+
+  setInviteeFormMode("edit", invitee);
+  toggleInviteeForm(true);
 }
 
 function renderEmptyEvents(message) {
@@ -274,6 +516,7 @@ function renderEvents() {
     facts.append(
       createFact("Time", getEventTimeRange(event)),
       createFact("Location", event.location),
+      createFact("RSVP", getRsvpSummary(event.id)),
       createFact("Description", event.description || "No description yet.")
     );
 
@@ -314,7 +557,7 @@ function renderEvents() {
     eventsSection.append(eventCard);
   });
 
-  renderEventDetails(dashboardEvents.find((event) => event.id === selectedEventId));
+  renderEventDetails(getSelectedEvent());
 }
 
 async function getAuthenticatedUser() {
@@ -338,12 +581,117 @@ async function getAuthenticatedUser() {
   return data.session.user;
 }
 
+function groupInviteesByEvent(invitees, eventIds = []) {
+  const groupedInvitees = {};
+
+  eventIds.forEach((eventId) => {
+    groupedInvitees[eventId] = [];
+  });
+
+  invitees.forEach((invitee) => {
+    if (!groupedInvitees[invitee.event_id]) {
+      groupedInvitees[invitee.event_id] = [];
+    }
+
+    groupedInvitees[invitee.event_id].push({
+      ...invitee,
+      rsvp_status: normalizeRsvpStatus(invitee.rsvp_status)
+    });
+  });
+
+  return groupedInvitees;
+}
+
+async function loadInviteesForEvent(eventId) {
+  if (!eventId) {
+    return;
+  }
+
+  const token = ++inviteeLoadToken;
+  loadingInviteeEventId = eventId;
+  renderEventDetails(getSelectedEvent());
+
+  try {
+    await getAuthenticatedUser();
+    const { data, error } = await withTimeout(
+      dashboardClient
+        .from("event_invitees")
+        .select("id,event_id,name,email,phone,rsvp_status,created_at")
+        .eq("event_id", eventId)
+        .order("created_at", { ascending: true }),
+      "Loading invitees is taking too long. Please refresh and try again."
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    if (token !== inviteeLoadToken) {
+      return;
+    }
+
+    inviteesByEvent = {
+      ...inviteesByEvent,
+      [eventId]: groupInviteesByEvent(data || [], [eventId])[eventId]
+    };
+    renderEvents();
+  } catch (error) {
+    if (token === inviteeLoadToken) {
+      inviteesByEvent = {
+        ...inviteesByEvent,
+        [eventId]: []
+      };
+      showDashboardMessage(`Unable to load invitees: ${error.message}`, "error");
+      renderEvents();
+    }
+  } finally {
+    if (token === inviteeLoadToken) {
+      loadingInviteeEventId = null;
+      renderEventDetails(getSelectedEvent());
+    }
+  }
+}
+
+async function loadInviteesForEvents(eventIds) {
+  if (!eventIds.length) {
+    inviteesByEvent = {};
+    return;
+  }
+
+  loadingInviteeEventId = selectedEventId;
+  renderEventDetails(getSelectedEvent());
+
+  try {
+    const { data, error } = await withTimeout(
+      dashboardClient
+        .from("event_invitees")
+        .select("id,event_id,name,email,phone,rsvp_status,created_at")
+        .in("event_id", eventIds)
+        .order("created_at", { ascending: true }),
+      "Loading invitees is taking too long. Please refresh and try again."
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    inviteesByEvent = groupInviteesByEvent(data || [], eventIds);
+  } catch (error) {
+    inviteesByEvent = groupInviteesByEvent([], eventIds);
+    showDashboardMessage(`Unable to load invitees: ${error.message}`, "error");
+  } finally {
+    loadingInviteeEventId = null;
+    renderEvents();
+  }
+}
+
 async function loadDashboardEvents() {
   if (!dashboardShell) {
     return;
   }
 
   renderEmptyEvents("Loading your events...");
+  inviteesByEvent = {};
 
   try {
     const user = await getAuthenticatedUser();
@@ -363,8 +711,13 @@ async function loadDashboardEvents() {
 
     dashboardEvents = data || [];
     renderEvents();
+
+    if (dashboardEvents.length) {
+      await loadInviteesForEvents(dashboardEvents.map((event) => event.id));
+    }
   } catch (error) {
     dashboardEvents = [];
+    inviteesByEvent = {};
     const isAuthError = error.message === "Please log in to manage events.";
     renderEmptyEvents(
       isAuthError ? "Log in to view your events." : "Unable to load events right now."
@@ -383,6 +736,17 @@ function getEventFormValues() {
     end_time: String(formData.get("end_time") || ""),
     location: String(formData.get("location") || "").trim(),
     description: String(formData.get("description") || "").trim()
+  };
+}
+
+function getInviteeFormValues() {
+  const formData = new FormData(inviteeForm);
+
+  return {
+    name: String(formData.get("name") || "").trim(),
+    email: String(formData.get("email") || "").trim(),
+    phone: String(formData.get("phone") || "").trim(),
+    rsvp_status: normalizeRsvpStatus(formData.get("rsvp_status"))
   };
 }
 
@@ -456,6 +820,87 @@ async function handleEventSubmit(event) {
   }
 }
 
+async function handleInviteeSubmit(event) {
+  event.preventDefault();
+
+  if (!inviteeForm) {
+    return;
+  }
+
+  const selectedEvent = getSelectedEvent();
+
+  if (!selectedEvent) {
+    showDashboardMessage("Select an event before adding invitees.", "error");
+    return;
+  }
+
+  setInviteeFormLoading(true);
+  showDashboardMessage("Saving invitee...", "success");
+
+  try {
+    await getAuthenticatedUser();
+    const inviteeValues = getInviteeFormValues();
+    const isEditing = Boolean(editingInviteeId);
+    let error;
+
+    if (!inviteeValues.name || !inviteeValues.email) {
+      throw new Error("Name and email are required.");
+    }
+
+    if (isEditing) {
+      const result = await withTimeout(
+        dashboardClient
+          .from("event_invitees")
+          .update(inviteeValues)
+          .eq("id", editingInviteeId)
+          .eq("event_id", selectedEvent.id)
+          .select("id")
+          .maybeSingle(),
+        "Updating the invitee is taking too long. Please refresh and try again."
+      );
+
+      error = result.error;
+
+      if (error) {
+        throw error;
+      }
+
+      if (!result.data?.id) {
+        throw new Error("Invitee could not be updated. Please refresh and try again.");
+      }
+    } else {
+      const result = await withTimeout(
+        dashboardClient
+          .from("event_invitees")
+          .insert({
+            ...inviteeValues,
+            event_id: selectedEvent.id
+          })
+          .select("id")
+          .single(),
+        "Creating the invitee is taking too long. Please refresh and try again."
+      );
+
+      error = result.error;
+    }
+
+    if (error) {
+      throw error;
+    }
+
+    toggleInviteeForm(false);
+    showDashboardMessage(
+      isEditing ? "Invitee updated successfully." : "Invitee added successfully.",
+      "success"
+    );
+    await loadInviteesForEvent(selectedEvent.id);
+  } catch (error) {
+    showDashboardMessage(error.message, "error");
+  } finally {
+    setInviteeFormLoading(false);
+  }
+}
+
 async function handleDeleteEvent(eventId) {
   const event = dashboardEvents.find((dashboardEvent) => dashboardEvent.id === eventId);
   const eventName = event?.title || "this event";
@@ -502,8 +947,60 @@ async function handleDeleteEvent(eventId) {
   }
 }
 
+async function handleDeleteInvitee(inviteeId) {
+  const selectedEvent = getSelectedEvent();
+  const invitee = getInviteesForEvent(selectedEvent?.id).find(
+    (eventInvitee) => eventInvitee.id === inviteeId
+  );
+  const inviteeName = invitee?.name || "this invitee";
+
+  if (!selectedEvent) {
+    showDashboardMessage("Select an event before deleting invitees.", "error");
+    return;
+  }
+
+  if (!window.confirm(`Delete "${inviteeName}" from ${selectedEvent.title}? This cannot be undone.`)) {
+    return;
+  }
+
+  showDashboardMessage("Deleting invitee...", "success");
+
+  try {
+    await getAuthenticatedUser();
+    const { data, error } = await withTimeout(
+      dashboardClient
+        .from("event_invitees")
+        .delete()
+        .eq("id", inviteeId)
+        .eq("event_id", selectedEvent.id)
+        .select("id")
+        .maybeSingle(),
+      "Deleting the invitee is taking too long. Please refresh and try again."
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data?.id) {
+      throw new Error("Invitee could not be deleted. Please refresh and try again.");
+    }
+
+    if (editingInviteeId === inviteeId) {
+      toggleInviteeForm(false);
+    }
+
+    showDashboardMessage("Invitee deleted successfully.", "success");
+    await loadInviteesForEvent(selectedEvent.id);
+  } catch (error) {
+    showDashboardMessage(error.message, "error");
+  }
+}
+
 document.addEventListener("click", (event) => {
-  const eventAction = event.target.closest("#create-event-button, #cancel-event-button");
+  const eventAction = event.target.closest(
+    "#create-event-button, #cancel-event-button, #add-invitee-button, #cancel-invitee-button"
+  );
 
   if (!eventAction) {
     return;
@@ -515,8 +1012,25 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (eventAction.id === "add-invitee-button") {
+    if (!getSelectedEvent()) {
+      showDashboardMessage("Select an event before adding invitees.", "error");
+      return;
+    }
+
+    setInviteeFormMode("create");
+    toggleInviteeForm(true);
+    return;
+  }
+
+  if (eventAction.id === "cancel-invitee-button") {
+    toggleInviteeForm(false);
+    return;
+  }
+
   toggleEventForm(false);
 });
 eventForm?.addEventListener("submit", handleEventSubmit);
+inviteeForm?.addEventListener("submit", handleInviteeSubmit);
 
 loadDashboardEvents();

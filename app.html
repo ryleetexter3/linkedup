@@ -87,10 +87,47 @@
           </div>
         </div>
         <p class="description" id="details-description">Create an event or choose one from your dashboard to see its details here.</p>
+        <p class="meta" id="details-rsvp-summary"></p>
 
-        <h3>Invitees</h3>
-        <div class="invitee-list" aria-label="Invitees and RSVP statuses">
-          <p class="empty-state">Invitees will be added in a later step.</p>
+        <div class="invitee-heading">
+          <h3>Invitees</h3>
+          <button class="secondary-button compact-button" id="add-invitee-button" type="button">Add Invitee</button>
+        </div>
+
+        <form class="invitee-form" id="invitee-form" hidden>
+          <div>
+            <label for="invitee-name">Name</label>
+            <input id="invitee-name" name="name" type="text" placeholder="Jordan Lee" required>
+          </div>
+
+          <div>
+            <label for="invitee-email">Email</label>
+            <input id="invitee-email" name="email" type="email" placeholder="jordan@example.com" required>
+          </div>
+
+          <div>
+            <label for="invitee-phone">Phone</label>
+            <input id="invitee-phone" name="phone" type="tel" placeholder="Optional">
+          </div>
+
+          <div>
+            <label for="invitee-rsvp-status">RSVP status</label>
+            <select id="invitee-rsvp-status" name="rsvp_status">
+              <option value="Invited">Invited</option>
+              <option value="Going">Going</option>
+              <option value="Maybe">Maybe</option>
+              <option value="Not Going">Not Going</option>
+            </select>
+          </div>
+
+          <div class="form-actions full-width-field">
+            <button class="secondary-button compact-button" id="cancel-invitee-button" type="button">Cancel</button>
+            <button class="primary-action compact-button" type="submit" data-default-text="Save Invitee">Save Invitee</button>
+          </div>
+        </form>
+
+        <div class="invitee-list" id="invitee-list" aria-label="Invitees and RSVP statuses">
+          <p class="empty-state">Select an event to view invitees.</p>
         </div>
       </article>
 
