@@ -60,4 +60,4 @@ https://linkedup-social.netlify.app
 
 ## Demo Video
 
-DEMO_VIDEO_URL_HERE
+https://youtu.be/vPI-_UqFGX8
